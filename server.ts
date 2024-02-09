@@ -717,6 +717,7 @@ export function close (exitCode: number | undefined) {
   }
 }
 // Fonction middleware pour vérifier si l'utilisateur est un administrateur
+// L'endroit de la fonction est pas le bon, il faudrait la mettre dans un dossier epxrès pour
 function isAdmin (req: Request, res: Response, next: NextFunction) {
   const user = security.authenticatedUsers.from(req)
   if (user && user.data.role === 'admin') {

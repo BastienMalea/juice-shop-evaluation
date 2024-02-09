@@ -7,8 +7,6 @@ import path = require('path')
 import { type Request, type Response, type NextFunction } from 'express'
 import challengeUtils = require('../lib/challengeUtils')
 
-import * as utils from '../lib/utils'
-const security = require('../lib/insecurity')
 const challenges = require('../data/datacache').challenges
 
 module.exports = function servePublicFiles () {
@@ -24,17 +22,25 @@ module.exports = function servePublicFiles () {
   }
 
   function verify (file: string, res: Response, next: NextFunction) {
-    if (file && (endsWithAllowlistedFileType(file) || (file === 'incident-support.kdbx'))) {
-      file = security.cutOffPoisonNullByte(file)
+    // Remove any null bytes or other control characters that could be used to manipulate the file path
+    file = file.replace(/[\0]+/g, '')
 
-      challengeUtils.solveIf(challenges.directoryListingChallenge, () => { return file.toLowerCase() === 'acquisitions.md' })
-      verifySuccessfulPoisonNullByteExploit(file)
-
-      res.sendFile(path.resolve('ftp/', file))
+    // Ensure the file has a valid, allow listed extension after sanitization
+    if (isValidExtension(file)) {
+      // Proceed to serve the file, ensuring that the path is correctly resolved and does not traverse directories
+      const filePath = path.resolve('ftp/', file)
+      // Security measure to prevent directory traversal attacks
+      if (filePath.startsWith(path.resolve('ftp/'))) {
+        res.sendFile(filePath)
+      } else {
+        res.status(403).send('Access to the requested file path is forbidden.')
+      }
     } else {
-      res.status(403)
-      next(new Error('Only .md and .pdf files are allowed!'))
+      res.status(403).send('Invalid file type.')
     }
+
+    challengeUtils.solveIf(challenges.directoryListingChallenge, () => { return file.toLowerCase() === 'acquisitions.md' })
+    verifySuccessfulPoisonNullByteExploit(file)
   }
 
   function verifySuccessfulPoisonNullByteExploit (file: string) {
@@ -49,7 +55,9 @@ module.exports = function servePublicFiles () {
     })
   }
 
-  function endsWithAllowlistedFileType (param: string) {
-    return utils.endsWith(param, '.md') || utils.endsWith(param, '.pdf')
+  function isValidExtension (file: string) {
+    const allowedExtensions = ['.md', '.pdf']
+    const extension = path.extname(file).toLowerCase()
+    return allowedExtensions.includes(extension)
   }
 }
