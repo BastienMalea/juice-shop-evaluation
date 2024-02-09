@@ -336,7 +336,7 @@ restoreOverwrittenFilesWithOriginals().then(() => {
     .delete(security.denyAll())
   /* Products: Only GET is allowed in order to view products */ // vuln-code-snippet neutral-line changeProductChallenge
   app.post('/api/Products', security.isAuthorized()) // vuln-code-snippet neutral-line changeProductChallenge
-  // app.put('/api/Products/:id', security.isAuthorized()) // vuln-code-snippet vuln-line changeProductChallenge
+  app.put('/api/Products/:id', security.isAuthorized(), isAdmin) // vuln-code-snippet vuln-line changeProductChallenge
   app.delete('/api/Products/:id', security.denyAll())
   /* Challenges: GET list of challenges allowed. Everything else forbidden entirely */
   app.post('/api/Challenges', security.denyAll())
@@ -714,6 +714,15 @@ export function close (exitCode: number | undefined) {
   }
   if (exitCode !== undefined) {
     process.exit(exitCode)
+  }
+}
+// Fonction middleware pour vérifier si l'utilisateur est un administrateur
+function isAdmin (req: Request, res: Response, next: NextFunction) {
+  const user = security.authenticatedUsers.from(req)
+  if (user && user.data.role === 'admin') {
+    next()
+  } else {
+    res.status(403).json({ error: 'Access denied. Only administrators can modify products.' })
   }
 }
 // vuln-code-snippet end exposedMetricsChallenge
